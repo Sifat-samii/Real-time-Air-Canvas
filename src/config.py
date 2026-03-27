@@ -1,0 +1,89 @@
+"""Central configuration values for the air canvas application."""
+
+WINDOW_NAME = "Real-Time AI Air Canvas"
+CAMERA_INDEX = 0
+CAMERA_FALLBACK_INDEXES = (0, 1, 2)
+DEFAULT_MIRROR_FRAME = True
+MAX_CAMERA_READ_FAILURES = 15
+
+FRAME_WIDTH = 1280
+FRAME_HEIGHT = 720
+
+LANDMARK_CIRCLE_RADIUS = 5
+CURSOR_RADIUS = 10
+CURSOR_THICKNESS = 2
+CURSOR_ERASER_RADIUS = 14
+
+PALETTE_HEIGHT = 70
+PALETTE_MARGIN = 10
+PALETTE_BOX_WIDTH = 130
+PALETTE_BOX_HEIGHT = 45
+PALETTE_TEXT_SCALE = 0.6
+PALETTE_HOVER_TIME = 0.35
+PALETTE_HIT_INSET = 8
+
+DRAW_THICKNESS = 6
+ERASER_THICKNESS = 28
+ERASER_COLOR_NAME = "black"
+BACKGROUND_COLOR = (0, 0, 0)
+
+SMOOTHING_WINDOW = 5
+INTERPOLATION_STEPS = 6
+SMOOTHING_ALPHA = 0.35
+DRAW_DEADZONE_PIXELS = 4
+FAST_MOVEMENT_DISTANCE = 36
+FAST_INTERPOLATION_STEPS = 10
+
+ERASER_TOGGLE_COOLDOWN = 1.0
+CLEAR_COOLDOWN = 1.2
+ERASER_HOLD_TIME = 0.45
+CLEAR_HOLD_TIME = 0.6
+PALETTE_COOLDOWN = 0.45
+
+TEXT_COLOR = (255, 255, 255)
+TEXT_SCALE = 0.7
+TEXT_THICKNESS = 2
+STATUS_PANEL_WIDTH = 340
+STATUS_PANEL_HEIGHT = 152
+STATUS_PANEL_ALPHA = 0.62
+MODE_BADGE_X = 380
+MODE_BADGE_Y = 86
+MODE_BADGE_WIDTH = 170
+MODE_BADGE_HEIGHT = 38
+
+COLOR_MAP = {
+    "red": (0, 0, 255),
+    "green": (0, 255, 0),
+    "blue": (255, 0, 0),
+    "yellow": (0, 255, 255),
+    "black": (0, 0, 0),
+    "white": (255, 255, 255),
+}
+
+PALETTE_ORDER = ["red", "green", "blue", "yellow", "black"]
+
+FINGERTIP_IDS = {
+    "thumb": 4,
+    "index": 8,
+    "middle": 12,
+    "ring": 16,
+    "pinky": 20,
+}
+
+FINGER_PIP_IDS = {
+    "thumb": 3,
+    "index": 6,
+    "middle": 10,
+    "ring": 14,
+    "pinky": 18,
+}
+
+FINGER_MCP_IDS = {
+    "thumb": 2,
+    "index": 5,
+    "middle": 9,
+    "ring": 13,
+    "pinky": 17,
+}
+
+INDEX_FINGER_NAME = "index"
