@@ -5,6 +5,7 @@ A polished local desktop computer-vision project that turns a webcam into an air
 ## Features
 
 - Live webcam hand tracking with MediaPipe Hands
+- Fullscreen window on startup with fullscreen toggle support
 - Smooth index-finger air drawing with moving average smoothing, exponential smoothing, and adaptive interpolation
 - Clean palette interaction with hover confirmation and safer hitboxes
 - Eraser mode, clear gesture, new blank canvas, undo, and redo
@@ -106,28 +107,31 @@ python main.py
 - `S`: save the current canvas as a PNG
 - `T`: save the current canvas as a transparent PNG
 - `P`: save a screenshot of the composite output
+- `F`: toggle fullscreen
+- `G`: toggle FPS display
 - `M`: toggle webcam mirroring
 - `L`: toggle landmark visibility
 - `H`: toggle help overlay
-- `F`: toggle FPS display
 - `E` or `Esc`: exit the application
 
 ## Test Checklist
 
 1. Run the app and confirm the webcam opens.
-2. Raise only your index finger and draw slow and fast strokes.
-3. Hover over a palette box and confirm the color changes only after a short hold.
-4. Show an open palm long enough to toggle eraser mode.
-5. Make a fist long enough to clear the canvas.
-6. Draw multiple strokes, then test `Z` and `Y`.
-7. Press `S`, `T`, and `P` to confirm files are written locally.
-8. Toggle `M`, `L`, `H`, and `F` to verify the HUD updates correctly.
+2. Confirm the app starts in fullscreen and `F` toggles fullscreen on and off.
+3. Raise only your index finger and draw slow and fast strokes.
+4. Hover over a palette box and confirm the color changes only after a short hold.
+5. Show an open palm long enough to toggle eraser mode, then erase parts of existing strokes.
+6. Make a fist long enough to clear the canvas.
+7. Draw multiple strokes, then test `Z` and `Y`.
+8. Press `S`, `T`, and `P` to confirm files are written locally.
+9. Toggle `M`, `L`, `H`, and `G` to verify the HUD updates correctly.
 
 ## Behavior Notes
 
 - Drawing is disabled while interacting with the palette.
 - Palette hitboxes are slightly inset to reduce accidental switches near box edges.
 - Clear and eraser gestures require both hold time and release-to-rearm behavior.
+- The eraser renders directly against the canvas background and is stored as its own stroke type, so it removes prior drawing reliably.
 - Undo and redo operate on complete strokes, not partial in-progress segments.
 - Transparent export contains only the drawing, not the webcam frame.
 
@@ -137,6 +141,7 @@ python main.py
 - Thumb detection remains the most angle-sensitive part of the gesture model.
 - Hand tracking quality still depends on lighting, camera quality, and background clutter.
 - Gesture timings and smoothing thresholds may need local tuning for different webcams and laptops.
+- Fullscreen display behavior can vary slightly by OS and GPU driver because it depends on OpenCV window handling.
 - Redo history is cleared when you draw a new stroke after undoing, which is expected behavior.
 
 ## Manual Tuning Areas
@@ -144,6 +149,7 @@ python main.py
 If you want to tune behavior further, adjust values in `src/config.py`:
 
 - smoothing and interpolation values
+- pointer smoothing and jump suppression values
 - palette hover timing
 - gesture hold durations
 - brush and eraser thickness defaults

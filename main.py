@@ -27,6 +27,7 @@ from src.config import (
     SAVE_PREFIX,
     SHOW_FPS_BY_DEFAULT,
     SHOW_HELP_BY_DEFAULT,
+    START_IN_FULLSCREEN,
     TOAST_DURATION_SECONDS,
     TRANSPARENT_PREFIX,
     WINDOW_NAME,
@@ -47,6 +48,7 @@ class AppState:
     landmarks_visible: bool = DRAW_LANDMARKS_BY_DEFAULT
     help_visible: bool = SHOW_HELP_BY_DEFAULT
     fps_visible: bool = SHOW_FPS_BY_DEFAULT
+    fullscreen_enabled: bool = START_IN_FULLSCREEN
     toast_message: str = ""
     toast_expires_at: float = 0.0
 
@@ -88,7 +90,17 @@ def estimate_fps(frame_times: deque[float]) -> float:
     return (len(frame_times) - 1) / elapsed
 
 
-def handle_keypress(key: int, app_state: AppState, canvas: CanvasManager, latest_frame) -> bool:
+def configure_window(frame_width: int, frame_height: int, fullscreen_enabled: bool) -> None:
+    """Configure the main OpenCV window for the current display mode."""
+    cv2.namedWindow(WINDOW_NAME, cv2.WINDOW_NORMAL)
+    if fullscreen_enabled:
+        cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_FULLSCREEN)
+    else:
+        cv2.setWindowProperty(WINDOW_NAME, cv2.WND_PROP_FULLSCREEN, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(WINDOW_NAME, frame_width, frame_height)
+
+
+def handle_keypress(key: int, app_state: AppState, canvas: CanvasManager, latest_frame, frame_width: int, frame_height: int) -> bool:
     """Handle keyboard shortcuts. Return True when the app should exit."""
     if key in (27, ord("e"), ord("E")):
         return True
@@ -105,6 +117,10 @@ def handle_keypress(key: int, app_state: AppState, canvas: CanvasManager, latest
         app_state.help_visible = not app_state.help_visible
         app_state.set_toast(f"Help overlay {'shown' if app_state.help_visible else 'hidden'}")
     elif key in (ord("f"), ord("F")):
+        app_state.fullscreen_enabled = not app_state.fullscreen_enabled
+        configure_window(frame_width, frame_height, app_state.fullscreen_enabled)
+        app_state.set_toast(f"Fullscreen {'enabled' if app_state.fullscreen_enabled else 'disabled'}")
+    elif key in (ord("g"), ord("G")):
         app_state.fps_visible = not app_state.fps_visible
         app_state.set_toast(f"FPS {'shown' if app_state.fps_visible else 'hidden'}")
     elif key == ord("["):
@@ -144,15 +160,18 @@ def main() -> int:
 
     tracker = HandTracker()
     gestures = GestureInterpreter()
-    canvas = CanvasManager(FRAME_WIDTH, FRAME_HEIGHT)
     ui = UIManager()
     app_state = AppState()
     frame_times: deque[float] = deque(maxlen=30)
     read_failures = 0
     latest_composed_frame = None
+    canvas = None
+    frame_width = FRAME_WIDTH
+    frame_height = FRAME_HEIGHT
     app_state.set_toast(f"Camera {camera_result} ready")
 
     try:
+        configure_window(frame_width, frame_height, app_state.fullscreen_enabled)
         while True:
             success, frame = capture.read()
             if not success:
@@ -164,6 +183,12 @@ def main() -> int:
 
             read_failures = 0
             frame_times.append(cv2.getTickCount() / cv2.getTickFrequency())
+            frame_height, frame_width = frame.shape[:2]
+            ui.update_layout(frame_width, frame_height)
+
+            if canvas is None:
+                canvas = CanvasManager(frame_width, frame_height)
+                configure_window(frame_width, frame_height, app_state.fullscreen_enabled)
 
             if app_state.mirror_frame:
                 frame = cv2.flip(frame, 1)
@@ -187,6 +212,7 @@ def main() -> int:
                 brush_thickness=app_state.brush_thickness,
                 eraser_thickness=app_state.eraser_thickness,
                 mirror_enabled=app_state.mirror_frame,
+                fullscreen_enabled=app_state.fullscreen_enabled,
                 landmarks_visible=app_state.landmarks_visible,
                 help_visible=app_state.help_visible,
                 fps_visible=app_state.fps_visible,
@@ -204,11 +230,12 @@ def main() -> int:
 
             cv2.imshow(WINDOW_NAME, latest_composed_frame)
             key = cv2.waitKey(1) & 0xFF
-            if handle_keypress(key, app_state, canvas, latest_composed_frame):
+            if handle_keypress(key, app_state, canvas, latest_composed_frame, frame_width, frame_height):
                 break
 
     finally:
-        canvas.end_stroke()
+        if canvas is not None:
+            canvas.end_stroke()
         tracker.close()
         if capture is not None:
             capture.release()

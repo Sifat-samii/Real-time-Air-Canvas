@@ -11,11 +11,14 @@ import mediapipe as mp
 from .config import (
     DRAW_LANDMARKS_BY_DEFAULT,
     HAND_DETECTION_CONFIDENCE,
+    HAND_MODEL_COMPLEXITY,
     HAND_TRACKING_CONFIDENCE,
+    LANDMARK_MAX_JUMP_FACTOR,
     LANDMARK_CONNECTION_COLOR,
     LANDMARK_CONNECTION_THICKNESS,
     LANDMARK_POINT_COLOR,
     LANDMARK_POINT_RADIUS,
+    LANDMARK_SMOOTHING_ALPHA,
     MAX_NUM_HANDS,
 )
 
@@ -53,9 +56,11 @@ class HandTracker:
             circle_radius=LANDMARK_POINT_RADIUS,
         )
         self.draw_landmarks = draw_landmarks
+        self._previous_landmarks: Optional[List[Tuple[int, int]]] = None
         self._hands = self._mp_hands.Hands(
             static_image_mode=False,
             max_num_hands=max_num_hands,
+            model_complexity=HAND_MODEL_COMPLEXITY,
             min_detection_confidence=min_detection_confidence,
             min_tracking_confidence=min_tracking_confidence,
         )
@@ -80,6 +85,8 @@ class HandTracker:
                 pixel_landmarks.append((int(landmark.x * frame_width), int(landmark.y * frame_height)))
                 normalized_landmarks.append((landmark.x, landmark.y))
 
+            pixel_landmarks = self._smooth_landmarks(pixel_landmarks)
+
             if draw_hand_overlay:
                 self._mp_draw.draw_landmarks(
                     frame,
@@ -95,9 +102,48 @@ class HandTracker:
                 handedness=classification.label,
                 confidence=classification.score,
             )
+        else:
+            self._previous_landmarks = None
 
         return frame, hand_data
 
     def close(self) -> None:
         """Release MediaPipe resources."""
         self._hands.close()
+
+    def _smooth_landmarks(self, landmarks: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+        """Smooth landmarks and cap sudden jumps for more stable tracking."""
+        if self._previous_landmarks is None:
+            self._previous_landmarks = landmarks
+            return landmarks
+
+        hand_size = self._estimate_hand_size(landmarks)
+        max_jump = max(20.0, hand_size * LANDMARK_MAX_JUMP_FACTOR)
+        smoothed_landmarks: List[Tuple[int, int]] = []
+
+        for current, previous in zip(landmarks, self._previous_landmarks):
+            dx = current[0] - previous[0]
+            dy = current[1] - previous[1]
+            distance = (dx * dx + dy * dy) ** 0.5
+            if distance > max_jump and distance > 0:
+                scale = max_jump / distance
+                current = (int(previous[0] + dx * scale), int(previous[1] + dy * scale))
+
+            smoothed_landmarks.append(
+                (
+                    int((1 - LANDMARK_SMOOTHING_ALPHA) * previous[0] + LANDMARK_SMOOTHING_ALPHA * current[0]),
+                    int((1 - LANDMARK_SMOOTHING_ALPHA) * previous[1] + LANDMARK_SMOOTHING_ALPHA * current[1]),
+                )
+            )
+
+        self._previous_landmarks = smoothed_landmarks
+        return smoothed_landmarks
+
+    def _estimate_hand_size(self, landmarks: List[Tuple[int, int]]) -> float:
+        wrist = landmarks[0]
+        middle_mcp = landmarks[9]
+        index_mcp = landmarks[5]
+        pinky_mcp = landmarks[17]
+        palm_height = ((wrist[0] - middle_mcp[0]) ** 2 + (wrist[1] - middle_mcp[1]) ** 2) ** 0.5
+        palm_width = ((index_mcp[0] - pinky_mcp[0]) ** 2 + (index_mcp[1] - pinky_mcp[1]) ** 2) ** 0.5
+        return max(palm_height, palm_width)

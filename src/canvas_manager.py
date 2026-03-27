@@ -79,7 +79,8 @@ class CanvasManager:
             return
 
         thickness = eraser_thickness if gesture_state.eraser_enabled else brush_thickness
-        self._ensure_active_stroke(color=color, thickness=thickness, is_eraser=gesture_state.eraser_enabled)
+        stroke_color = BACKGROUND_COLOR if gesture_state.eraser_enabled else color
+        self._ensure_active_stroke(color=stroke_color, thickness=thickness, is_eraser=gesture_state.eraser_enabled)
         self._append_point(pointer)
 
     def end_stroke(self) -> None:
@@ -155,7 +156,11 @@ class CanvasManager:
             self._previous_draw_point = interpolated_point
 
     def _render_segment(self, start: Point, end: Point, stroke: Stroke) -> None:
-        cv2.line(self.canvas, start, end, stroke.color, stroke.thickness, cv2.LINE_AA)
+        line_type = cv2.LINE_8 if stroke.is_eraser else cv2.LINE_AA
+        cv2.line(self.canvas, start, end, stroke.color, stroke.thickness, line_type)
+        if stroke.is_eraser:
+            cv2.circle(self.canvas, start, stroke.thickness // 2, BACKGROUND_COLOR, -1, cv2.LINE_8)
+            cv2.circle(self.canvas, end, stroke.thickness // 2, BACKGROUND_COLOR, -1, cv2.LINE_8)
 
     def _rebuild_canvas(self) -> None:
         self.canvas[:] = BACKGROUND_COLOR
