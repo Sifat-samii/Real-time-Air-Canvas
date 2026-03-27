@@ -17,8 +17,8 @@ from .config import (
     FINGERTIP_IDS,
     INDEX_FINGER_NAME,
     PALETTE_COOLDOWN,
-    PALETTE_HOVER_TIME,
     PALETTE_HIT_INSET,
+    PALETTE_HOVER_TIME,
 )
 from .utils import point_distance, point_in_rect, shrink_rect
 
@@ -36,10 +36,11 @@ class GestureState:
     eraser_enabled: bool
     status_text: str
     hovered_palette_name: Optional[str]
+    hand_confidence: float
 
 
 class GestureInterpreter:
-    """Track gesture state and enforce hold and cooldown rules."""
+    """Track gesture state and enforce hold, hover, and cooldown rules."""
 
     def __init__(self) -> None:
         self.brush_color_name = "red"
@@ -69,6 +70,7 @@ class GestureInterpreter:
             pointer=None,
             status_text="Show one hand to begin",
             hovered_palette_name=None,
+            hand_confidence=0.0,
         )
 
     def update(self, hand_data, palette_boxes) -> GestureState:
@@ -78,15 +80,15 @@ class GestureInterpreter:
         hovered_color = self._palette_hit(pointer, palette_boxes)
         now = time.monotonic()
 
-        clear_state = self._handle_clear(finger_states, pointer, now)
+        clear_state = self._handle_clear(finger_states, pointer, now, hand_data.confidence)
         if clear_state is not None:
             return clear_state
 
-        eraser_state = self._handle_eraser_toggle(finger_states, pointer, now)
+        eraser_state = self._handle_eraser_toggle(finger_states, pointer, now, hand_data.confidence)
         if eraser_state is not None:
             return eraser_state
 
-        palette_state = self._handle_palette_hover(finger_states, pointer, hovered_color, now)
+        palette_state = self._handle_palette_hover(finger_states, pointer, hovered_color, now, hand_data.confidence)
         if palette_state is not None:
             return palette_state
 
@@ -96,8 +98,9 @@ class GestureInterpreter:
                 mode="eraser" if self.eraser_enabled else "draw",
                 finger_states=finger_states,
                 pointer=pointer,
-                status_text="Erase" if self.eraser_enabled else "Drawing",
+                status_text="Erasing" if self.eraser_enabled else "Drawing",
                 hovered_palette_name=None,
+                hand_confidence=hand_data.confidence,
             )
 
         return self._build_state(
@@ -107,10 +110,11 @@ class GestureInterpreter:
             pointer=pointer,
             status_text="Move to draw or hover over palette",
             hovered_palette_name=hovered_color,
+            hand_confidence=hand_data.confidence,
         )
 
     def current_color_name(self) -> str:
-        """Return the active visible color, respecting eraser mode."""
+        """Return the active color name, respecting eraser mode."""
         return ERASER_COLOR_NAME if self.eraser_enabled else self.brush_color_name
 
     def _detect_finger_states(self, hand_data) -> Dict[str, bool]:
@@ -152,7 +156,7 @@ class GestureInterpreter:
         return horizontal_span > margin and horizontal_span > vertical_compactness
 
     def _is_draw_gesture(self, finger_states: Dict[str, bool]) -> bool:
-        return finger_states["index"] and not any(
+        return finger_states.get("index", False) and not any(
             finger_states[finger] for finger in ("middle", "ring", "pinky", "thumb")
         )
 
@@ -168,7 +172,7 @@ class GestureInterpreter:
                 return color_name
         return None
 
-    def _handle_clear(self, finger_states, pointer, now: float) -> Optional[GestureState]:
+    def _handle_clear(self, finger_states, pointer, now: float, hand_confidence: float) -> Optional[GestureState]:
         if self._is_fist(finger_states):
             self._hovered_palette_name = None
             self._palette_hover_start = None
@@ -181,6 +185,7 @@ class GestureInterpreter:
                     pointer=pointer,
                     status_text="Release fist to re-arm clear",
                     hovered_palette_name=None,
+                    hand_confidence=hand_confidence,
                 )
 
             if self._clear_hold_start is None:
@@ -194,6 +199,7 @@ class GestureInterpreter:
                     pointer=pointer,
                     status_text="Clear cooling down",
                     hovered_palette_name=None,
+                    hand_confidence=hand_confidence,
                 )
 
             remaining = max(0.0, CLEAR_HOLD_TIME - (now - self._clear_hold_start))
@@ -205,6 +211,7 @@ class GestureInterpreter:
                     pointer=pointer,
                     status_text=f"Hold fist {remaining:.1f}s to clear",
                     hovered_palette_name=None,
+                    hand_confidence=hand_confidence,
                 )
 
             self._clear_latched = True
@@ -216,13 +223,14 @@ class GestureInterpreter:
                 pointer=pointer,
                 status_text="Canvas cleared",
                 hovered_palette_name=None,
+                hand_confidence=hand_confidence,
             )
 
         self._clear_hold_start = None
         self._clear_latched = False
         return None
 
-    def _handle_eraser_toggle(self, finger_states, pointer, now: float) -> Optional[GestureState]:
+    def _handle_eraser_toggle(self, finger_states, pointer, now: float, hand_confidence: float) -> Optional[GestureState]:
         if self._all_fingers_up(finger_states):
             self._hovered_palette_name = None
             self._palette_hover_start = None
@@ -235,6 +243,7 @@ class GestureInterpreter:
                     pointer=pointer,
                     status_text="Release open palm to re-arm toggle",
                     hovered_palette_name=None,
+                    hand_confidence=hand_confidence,
                 )
 
             if self._eraser_hold_start is None:
@@ -248,6 +257,7 @@ class GestureInterpreter:
                     pointer=pointer,
                     status_text="Tool toggle cooling down",
                     hovered_palette_name=None,
+                    hand_confidence=hand_confidence,
                 )
 
             remaining = max(0.0, ERASER_HOLD_TIME - (now - self._eraser_hold_start))
@@ -259,6 +269,7 @@ class GestureInterpreter:
                     pointer=pointer,
                     status_text=f"Hold open palm {remaining:.1f}s to toggle eraser",
                     hovered_palette_name=None,
+                    hand_confidence=hand_confidence,
                 )
 
             self.eraser_enabled = not self.eraser_enabled
@@ -271,13 +282,21 @@ class GestureInterpreter:
                 pointer=pointer,
                 status_text="Eraser enabled" if self.eraser_enabled else "Pen restored",
                 hovered_palette_name=None,
+                hand_confidence=hand_confidence,
             )
 
         self._eraser_hold_start = None
         self._eraser_latched = False
         return None
 
-    def _handle_palette_hover(self, finger_states, pointer, hovered_color, now: float) -> Optional[GestureState]:
+    def _handle_palette_hover(
+        self,
+        finger_states,
+        pointer,
+        hovered_color,
+        now: float,
+        hand_confidence: float,
+    ) -> Optional[GestureState]:
         if hovered_color is None or not self._is_draw_gesture(finger_states):
             self._hovered_palette_name = None
             self._palette_hover_start = None
@@ -298,6 +317,7 @@ class GestureInterpreter:
                 pointer=pointer,
                 status_text="Palette cooling down",
                 hovered_palette_name=hovered_color,
+                hand_confidence=hand_confidence,
             )
 
         hover_elapsed = now - self._palette_hover_start
@@ -309,6 +329,7 @@ class GestureInterpreter:
                 pointer=pointer,
                 status_text=f"Hold on {hovered_color} {PALETTE_HOVER_TIME - hover_elapsed:.1f}s",
                 hovered_palette_name=hovered_color,
+                hand_confidence=hand_confidence,
             )
 
         self.brush_color_name = hovered_color
@@ -322,6 +343,7 @@ class GestureInterpreter:
             pointer=pointer,
             status_text=f"Brush set to {hovered_color}",
             hovered_palette_name=hovered_color,
+            hand_confidence=hand_confidence,
         )
 
     def _build_state(
@@ -332,6 +354,7 @@ class GestureInterpreter:
         pointer: Optional[Tuple[int, int]],
         status_text: str,
         hovered_palette_name: Optional[str],
+        hand_confidence: float,
     ) -> GestureState:
         return GestureState(
             gesture=gesture,
@@ -343,4 +366,5 @@ class GestureInterpreter:
             eraser_enabled=self.eraser_enabled,
             status_text=status_text,
             hovered_palette_name=hovered_palette_name,
+            hand_confidence=hand_confidence,
         )

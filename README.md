@@ -1,19 +1,18 @@
 # Real-Time AI Air Canvas
 
-A local Python computer-vision project that turns a laptop webcam into an air-drawing tool. The app tracks one hand in real time with MediaPipe Hands, interprets a focused set of gestures, and renders smooth strokes onto a separate drawing canvas blended over the webcam feed.
+A polished local desktop computer-vision project that turns a webcam into an air-drawing tool. It uses MediaPipe Hands for live hand tracking, OpenCV for rendering and interaction, and NumPy for fast canvas operations. The app stays lightweight and easy to run while adding enough reliability and UX polish to feel like a serious mini product.
 
 ## Features
 
-- Real-time webcam feed with live hand landmark detection
-- Smooth index-finger drawing with averaging, exponential smoothing, and interpolation
-- Safer palette hit detection with hover confirmation and inset hitboxes
-- Open-palm hold to toggle eraser mode
-- Fist hold to clear the canvas with cooldown and release-to-rearm logic
-- Separate persistent drawing canvas blended over the live camera frame
-- Clear on-screen UI for tool, brush color, mode, status, and controls
-- Save the current drawing canvas to a PNG with `S`
-- Toggle webcam mirroring with `M`
-- Lightweight FPS display in the overlay
+- Live webcam hand tracking with MediaPipe Hands
+- Smooth index-finger air drawing with moving average smoothing, exponential smoothing, and adaptive interpolation
+- Clean palette interaction with hover confirmation and safer hitboxes
+- Eraser mode, clear gesture, new blank canvas, undo, and redo
+- Adjustable brush thickness with separate eraser thickness
+- Save opaque canvas, transparent export, and composite screenshot
+- Mirror toggle, landmark toggle, help toggle, and FPS toggle
+- Structured stroke history for better state management and undo/redo
+- Clean HUD with tool, brush size, mode, status, and shortcut hints
 
 ## Tech Stack
 
@@ -22,7 +21,7 @@ A local Python computer-vision project that turns a laptop webcam into an air-dr
 - MediaPipe Hands
 - NumPy
 
-## Folder Structure
+## Project Structure
 
 ```text
 air_canvas/
@@ -39,12 +38,22 @@ air_canvas/
     utils.py
 ```
 
-## Setup
+## Architecture Summary
+
+- `main.py`: app loop, camera startup, keyboard controls, runtime toggles, save/export handling
+- `src/config.py`: central settings for camera, smoothing, gestures, brush sizes, UI defaults, and colors
+- `src/hand_tracker.py`: MediaPipe wrapper that returns clean hand landmark data and supports landmark visibility toggling
+- `src/gesture_logic.py`: finger-state detection, gesture classification, hover timing, and debounce/cooldown rules
+- `src/canvas_manager.py`: structured stroke storage, canvas rendering, undo/redo, and transparent export
+- `src/ui.py`: palette, HUD, help panel, toast feedback, and cursor rendering
+- `src/utils.py`: geometry helpers, smoothing helpers, save-path helpers, blending, and transparent conversion
+
+## Installation
 
 Use Python 3.10 or 3.11. MediaPipe is the dependency most likely to fail on unsupported Python versions.
 
 1. Open the `air_canvas` folder directly in VS Code.
-2. Open the integrated terminal in that folder.
+2. Open a terminal in that folder.
 3. Create a virtual environment:
 
 ```powershell
@@ -70,7 +79,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## Run
+## How To Run
 
 From the VS Code terminal, inside the `air_canvas` folder:
 
@@ -83,56 +92,68 @@ python main.py
 ### Gestures
 
 - `Only index finger up`: draw on the canvas
-- `Hold index fingertip over a palette box`: select a brush color
+- `Hold index fingertip over a palette box`: select a color
 - `Open palm for about 0.45 seconds`: toggle eraser mode
 - `Fist for about 0.6 seconds`: clear the canvas
 
 ### Keyboard
 
-- `C`: clear the canvas
-- `S`: save the current drawing canvas as a PNG
-- `M`: toggle mirrored webcam view
-- `E`: exit the application
+- `[` and `]`: decrease or increase brush thickness
+- `C`: clear the current canvas
+- `N`: start a new blank canvas
+- `Z`: undo the last stroke
+- `Y`: redo the last undone stroke
+- `S`: save the current canvas as a PNG
+- `T`: save the current canvas as a transparent PNG
+- `P`: save a screenshot of the composite output
+- `M`: toggle webcam mirroring
+- `L`: toggle landmark visibility
+- `H`: toggle help overlay
+- `F`: toggle FPS display
+- `E` or `Esc`: exit the application
+
+## Test Checklist
+
+1. Run the app and confirm the webcam opens.
+2. Raise only your index finger and draw slow and fast strokes.
+3. Hover over a palette box and confirm the color changes only after a short hold.
+4. Show an open palm long enough to toggle eraser mode.
+5. Make a fist long enough to clear the canvas.
+6. Draw multiple strokes, then test `Z` and `Y`.
+7. Press `S`, `T`, and `P` to confirm files are written locally.
+8. Toggle `M`, `L`, `H`, and `F` to verify the HUD updates correctly.
 
 ## Behavior Notes
 
-- Drawing happens only when the classifier detects the index-only gesture.
-- Palette selection requires a short hover, so passing through the top bar does not instantly switch colors.
-- Palette hit detection uses slightly inset hitboxes, so edge grazing is less likely to trigger a color switch.
-- Clear and eraser gestures require both a hold duration and a release before they can trigger again.
-- Stroke smoothing uses a short moving average, an exponential smoother, a deadzone, and extra interpolation during faster movement.
-- Saved images contain the drawing canvas only, not the webcam frame.
-
-## Foolproof Setup Checklist
-
-- Run the app from the `air_canvas` directory, not the parent workspace.
-- Make sure no other app is currently using the webcam.
-- If `mediapipe` fails to install, switch to Python 3.10 or 3.11.
-- If the app cannot open the webcam, edit `CAMERA_INDEX` in `src/config.py` and try another value.
-- The app will also try fallback camera indexes automatically.
-- If the webcam window opens but stays black, close Zoom, Teams, Discord, browser tabs, or camera utilities.
-- If gestures feel unstable, improve lighting and keep your palm facing the camera more directly.
-- If the webcam appears backwards for your use case, press `M` to toggle mirroring.
+- Drawing is disabled while interacting with the palette.
+- Palette hitboxes are slightly inset to reduce accidental switches near box edges.
+- Clear and eraser gestures require both hold time and release-to-rearm behavior.
+- Undo and redo operate on complete strokes, not partial in-progress segments.
+- Transparent export contains only the drawing, not the webcam frame.
 
 ## Known Limitations
 
-- The project is tuned for one-hand use first.
-- Thumb detection is still the least stable part because thumb orientation changes a lot with camera angle.
-- Hand tracking quality depends heavily on lighting, camera quality, and background clutter.
-- MediaPipe can still lose the hand during fast motion or occlusion.
-- Gesture timing and smoothing thresholds may need local tuning depending on webcam resolution and latency.
+- The project is optimized for one hand first.
+- Thumb detection remains the most angle-sensitive part of the gesture model.
+- Hand tracking quality still depends on lighting, camera quality, and background clutter.
+- Gesture timings and smoothing thresholds may need local tuning for different webcams and laptops.
+- Redo history is cleared when you draw a new stroke after undoing, which is expected behavior.
+
+## Manual Tuning Areas
+
+If you want to tune behavior further, adjust values in `src/config.py`:
+
+- smoothing and interpolation values
+- palette hover timing
+- gesture hold durations
+- brush and eraser thickness defaults
+- camera resolution and preferred camera index
+- UI defaults for mirror, help, FPS, and landmark visibility
 
 ## Future Improvements
 
-- Save the composited webcam-plus-canvas view as an optional export
-- Add undo and redo support
-- Add thickness controls and a proper tool tray
-- Add handedness-aware calibration or per-user gesture tuning
-- Add multi-hand support
-- Add optional gesture customization
-
-## Camera And OS Notes
-
-- If the webcam does not open, check OS camera permissions for Python and VS Code.
-- On some laptops, OpenCV works better after other camera apps are fully closed.
-- If your machine has multiple cameras, the preferred camera index may not be `0`.
+- Add runtime controls for eraser thickness
+- Add saved session replay or time-lapse export
+- Add handedness-aware calibration and thumb tuning
+- Add a small settings panel instead of keyboard-only controls
+- Add optional multi-hand tools or custom gesture mapping
