@@ -42,7 +42,7 @@ from .config import (
 from .utils import Rect, blend_canvas
 
 
-@dataclass
+@dataclass(slots=True)
 class OverlayState:
     """UI-focused state passed into the renderer each frame."""
 
@@ -70,10 +70,9 @@ class UIManager:
     def resolve_color(self, color_name: str) -> Tuple[int, int, int]:
         return COLOR_MAP[color_name]
 
-    def compose(self, frame, canvas, gesture_state, overlay_state: OverlayState):
+    def compose(self, frame, canvas, gesture_state, overlay_state: OverlayState, canvas_has_content: bool):
         """Blend the frame and canvas, then add UI overlays."""
-        self.update_layout(frame.shape[1], frame.shape[0])
-        composed = blend_canvas(frame, canvas)
+        composed = blend_canvas(frame, canvas) if canvas_has_content else frame.copy()
         self._draw_palette(composed, gesture_state.brush_color_name, gesture_state.hovered_palette_name)
         self._draw_mode_badge(composed, gesture_state)
         self._draw_status_panel(composed, gesture_state, overlay_state)

@@ -23,7 +23,7 @@ from .config import (
 )
 
 
-@dataclass
+@dataclass(slots=True)
 class HandData:
     """Processed hand landmark information for a single detected hand."""
 

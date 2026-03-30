@@ -23,7 +23,7 @@ from .config import (
 from .utils import point_distance, point_in_rect, shrink_rect
 
 
-@dataclass
+@dataclass(slots=True)
 class GestureState:
     """Current interaction state derived from the tracked hand."""
 

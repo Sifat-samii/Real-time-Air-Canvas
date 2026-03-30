@@ -29,7 +29,7 @@ from .utils import average_point, clamp_point, exponential_smooth, interpolate_p
 Point = Tuple[int, int]
 
 
-@dataclass
+@dataclass(slots=True)
 class Stroke:
     """A structured stroke stored for undo/redo and export-friendly state."""
 
@@ -48,6 +48,7 @@ class CanvasManager:
         self.canvas = np.zeros((height, width, 3), dtype=np.uint8)
         self.strokes: List[Stroke] = []
         self.redo_stack: List[Stroke] = []
+        self.has_visible_content = False
         self._history: Deque[Point] = deque(maxlen=SMOOTHING_WINDOW)
         self._filtered_point: Optional[Point] = None
         self._previous_draw_point: Optional[Point] = None
@@ -58,6 +59,7 @@ class CanvasManager:
         self.canvas[:] = BACKGROUND_COLOR
         self.strokes.clear()
         self.redo_stack.clear()
+        self.has_visible_content = False
         self._active_stroke = None
         self._reset_stroke_tracking()
 
@@ -156,6 +158,7 @@ class CanvasManager:
             self._previous_draw_point = interpolated_point
 
     def _render_segment(self, start: Point, end: Point, stroke: Stroke) -> None:
+        self.has_visible_content = True
         line_type = cv2.LINE_8 if stroke.is_eraser else cv2.LINE_AA
         cv2.line(self.canvas, start, end, stroke.color, stroke.thickness, line_type)
         if stroke.is_eraser:
@@ -164,6 +167,7 @@ class CanvasManager:
 
     def _rebuild_canvas(self) -> None:
         self.canvas[:] = BACKGROUND_COLOR
+        self.has_visible_content = False
         for stroke in self.strokes:
             if len(stroke.points) < 2:
                 continue

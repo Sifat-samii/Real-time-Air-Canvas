@@ -38,7 +38,7 @@ from src.ui import OverlayState, UIManager
 from src.utils import build_save_path
 
 
-@dataclass
+@dataclass(slots=True)
 class AppState:
     """Mutable runtime state for app controls and user-facing toggles."""
 
@@ -226,6 +226,7 @@ def main() -> int:
                 canvas=canvas.canvas,
                 gesture_state=gesture_state,
                 overlay_state=overlay_state,
+                canvas_has_content=canvas.has_visible_content,
             )
 
             cv2.imshow(WINDOW_NAME, latest_composed_frame)
